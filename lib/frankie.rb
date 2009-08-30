@@ -29,7 +29,7 @@ module Frankie
   module EventContext
 
     # pin it to newer version of Facebooker
-    gem 'mmangino-facebooker', '>=1.0.2'
+    # gem 'mmangino-facebooker', '>=1.0.2'
     require 'facebooker'    
     
     def facebook_session
@@ -70,10 +70,9 @@ module Frankie
     
     def secure_with_facebook_params!
       return unless request_is_for_a_facebook_canvas?
-      
       if ['user', 'session_key'].all? {|element| facebook_params[element]}
         @facebook_session = new_facebook_session
-        @facebook_session.secure_with!(facebook_params['session_key'], facebook_params['user'], facebook_params['expires'])
+        @facebook_session.secure_with!(facebook_params['session_key'], facebook_params['user'], facebook_params['expires'], facebook_params['ss'])
         session[:facebook_session] = @facebook_session
       end
     end
@@ -120,6 +119,7 @@ module Frankie
     end
     
     def verify_signature(facebook_sig_params,expected_signature)
+      return true if expected_signature.nil?
       raw_string = facebook_sig_params.map{ |*args| args.join('=') }.sort.join
       actual_sig = Digest::MD5.hexdigest([raw_string, Facebooker::Session.secret_key].join)
       raise Facebooker::Session::IncorrectSignature if actual_sig != expected_signature
@@ -152,8 +152,9 @@ module Frankie
     end
     
     def request_is_for_a_facebook_canvas?
-      return false if params["fb_sig_in_canvas"].nil?
-      params["fb_sig_in_canvas"] == "1"
+        puts ["*"*75, "", "is for canvas?", ""].join("\n")
+      return false if (params["fb_sig_in_canvas"].nil? && params["fb_sig_in_iframe"].nil?)
+      (params["fb_sig_in_canvas"] == "1") || (params["fb_sig_in_iframe"] == '1')
     end
     
     def application_is_installed?
