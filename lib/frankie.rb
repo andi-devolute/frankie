@@ -139,12 +139,37 @@ module Frankie
       )
     end
 
-    def do_redirect(*args)
-      if request_is_for_a_facebook_canvas?
-        fbml_redirect_tag(args[0])
-      else
-        redirect args[0]
+    #
+    # Correctly handles a redirect, whether for canvas, IFRAME or standalone.
+    #
+    def do_redirect(redirect_url, *args)
+      case
+      when request_is_for_a_facebook_iframe? then html_redirect_snippet(redirect_url)
+      when request_is_for_a_facebook_canvas? then fbml_redirect_tag(redirect_url)
+      else redirect redirect_url
       end
+    end
+    # same nomenclature as rails facebooker
+    alias_method :top_redirect_to, :do_redirect
+
+    #
+    # Redirects the top window to the given url, handling javascript or
+    # non-javascript browsers
+    #
+    # stolen from facebooker gem
+    #
+    def top_redirect_to(redirect_url)
+      %Q{
+        <html><head>
+          <script type="text/javascript">
+            window.top.location.href = #{redirect_url.to_json};
+          </script>
+          <noscript>
+            <meta http-equiv="refresh" content="0;url=#{h redirect_url}" />
+            <meta http-equiv="window-target" content="_top" />
+          </noscript>
+        </head></html>
+      }
     end
 
     def fbml_redirect_tag(url)
@@ -152,8 +177,12 @@ module Frankie
     end
 
     def request_is_for_a_facebook_canvas?
-      return false if (params["fb_sig_in_canvas"].nil? && params["fb_sig_in_iframe"].nil?)
-      (params["fb_sig_in_canvas"] == "1") || (params["fb_sig_in_iframe"] == '1')
+      return false if (params["fb_sig_in_canvas"].nil?)
+      (params["fb_sig_in_canvas"] == "1")
+    end
+
+    def request_is_for_a_facebook_iframe?
+      (params["fb_sig_in_iframe"] == '1')
     end
 
     def application_is_installed?
